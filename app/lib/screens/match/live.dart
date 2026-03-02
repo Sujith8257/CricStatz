@@ -52,7 +52,6 @@ class LiveMatchScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const _FloatingActionBtn(),
           ],
         ),
       ),
@@ -198,7 +197,7 @@ class _ScoreBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 20),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Container(
@@ -222,10 +221,10 @@ class _ScoreBanner extends StatelessWidget {
             children: [
               // Overlay target graphic (iconb.png) similar to design.
               Positioned(
-                top: 30,
-                right: 10,
+                top: 50,
+                right: 20,
                 child: Opacity(
-                  opacity: 0.40,
+                  opacity: 0.50,
                   child: Image.asset(
                     AppAssets.iconTarget,
                     width: 60,
@@ -235,100 +234,107 @@ class _ScoreBanner extends StatelessWidget {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.all(24),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 15, vertical: 24),
                 child: Column(
                   children: [
                     // Top section: score + live badge
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Left: India score
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'INDIA INNINGS',
-                              style: TextStyle(
-                                color: AppColors.accent,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1.8,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              '284/4',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 40,
-                                fontWeight: FontWeight.w900,
-                                height: 1.1,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            RichText(
-                              text: const TextSpan(
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'INDIA INNINGS',
                                 style: TextStyle(
-                                    color: AppColors.white80, fontSize: 13),
-                                children: [
-                                  TextSpan(text: 'Overs: 42.3'),
-                                  TextSpan(
-                                      text: '  •  ',
-                                      style:
-                                          TextStyle(color: AppColors.white60)),
-                                  TextSpan(text: 'CRR: 6.68'),
-                                ],
+                                  color: AppColors.accent,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.8,
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 4),
+                              const Text(
+                                '284/4',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 40,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.1,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              RichText(
+                                text: const TextSpan(
+                                  style: TextStyle(
+                                      color: AppColors.white80, fontSize: 13),
+                                  children: [
+                                    TextSpan(text: 'Overs: 42.3'),
+                                    TextSpan(
+                                        text: '  •  ',
+                                        style: TextStyle(
+                                            color: AppColors.white60)),
+                                    TextSpan(text: 'CRR: 6.68'),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         // Right: live badge + target
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            // LIVE badge with pulse dot
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.red.shade600,
-                                borderRadius: BorderRadius.circular(50),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _PulseDot(),
-                                  const SizedBox(width: 4),
-                                  const Text(
-                                    'LIVE',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              // LIVE badge with pulse dot
+                              Align(
+                                alignment: Alignment.topRight,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.shade600,
+                                    borderRadius: BorderRadius.circular(50),
                                   ),
-                                ],
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      _PulseDot(),
+                                      const SizedBox(width: 4),
+                                      const Text(
+                                        'LIVE',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Target: 320',
-                              style: TextStyle(
-                                  color: AppColors.white60, fontSize: 12),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'India needs 36 runs in 45 balls',
-                              textAlign: TextAlign.right,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                fontStyle: FontStyle.italic,
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Target: 320',
+                                style: TextStyle(
+                                    color: AppColors.white60, fontSize: 12),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 4),
+                              const Text(
+                                'India needs 36 runs in 45 balls',
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -451,7 +457,7 @@ class _LiveContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: const [
@@ -580,7 +586,7 @@ class _BatsmanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       decoration: BoxDecoration(
         color: AppColors.cardDark,
         borderRadius: BorderRadius.circular(12),
@@ -592,15 +598,8 @@ class _BatsmanCard extends StatelessWidget {
                 bottom: BorderSide(color: AppColors.white5),
               )
             : Border.all(color: AppColors.white5),
-        boxShadow: active
-            ? [
-                BoxShadow(
-                  color: AppColors.accent.withOpacity(0.1),
-                  blurRadius: 12,
-                  spreadRadius: 1,
-                )
-              ]
-            : null,
+        // No elevation so the active card doesn't visually sit "on top"
+        // of the other card; only the left accent bar differentiates it.
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -642,33 +641,15 @@ class _BatsmanCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              _StatChip(label: '4s: $fours'),
-              const SizedBox(width: 8),
-              _StatChip(label: '6s: $sixes'),
-              const SizedBox(width: 8),
-              _StatChip(label: 'SR: $sr'),
-            ],
+          Text(
+            '4s: $fours   6s: $sixes   SR: $sr',
+            style: const TextStyle(
+              color: AppColors.slate400,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _StatChip extends StatelessWidget {
-  final String label;
-  const _StatChip({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      label,
-      style: const TextStyle(
-        color: AppColors.slate400,
-        fontSize: 10,
-        fontWeight: FontWeight.w700,
       ),
     );
   }
@@ -935,46 +916,6 @@ class _OverRow extends StatelessWidget {
               }).toList(),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Floating Action Button ────────────────────────────────────────────────────
-class _FloatingActionBtn extends StatelessWidget {
-  const _FloatingActionBtn();
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      bottom: 24,
-      right: 24,
-      child: GestureDetector(
-        onTap: () {},
-        child: AnimatedScale(
-          scale: 1.0,
-          duration: const Duration(milliseconds: 150),
-          child: Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: AppColors.accent,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.accent.withOpacity(0.45),
-                  blurRadius: 24,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.trending_up,
-              color: AppColors.primary,
-              size: 28,
-            ),
-          ),
         ),
       ),
     );
