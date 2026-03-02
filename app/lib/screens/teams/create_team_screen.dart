@@ -1,5 +1,4 @@
 import 'package:cricstatz/config/palette.dart';
-import 'package:cricstatz/models/team.dart';
 import 'package:cricstatz/providers/team_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -23,19 +22,17 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  void _submit() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    final Team team = Team(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
-      name: _nameController.text.trim(),
-      shortCode: _shortCodeController.text.trim().toUpperCase(),
-    );
+    await context.read<TeamProvider>().createTeam(
+          name: _nameController.text.trim(),
+          shortCode: _shortCodeController.text.trim().toUpperCase(),
+        );
 
-    context.read<TeamProvider>().addTeam(team);
-    Navigator.pop(context);
+    if (mounted) Navigator.pop(context);
   }
 
   @override

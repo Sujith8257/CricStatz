@@ -1,10 +1,22 @@
-import 'package:cricstatz/config/supabase_config.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseService {
-  bool get isConfigured =>
-      SupabaseConfig.url.isNotEmpty && SupabaseConfig.anonKey.isNotEmpty;
+  static SupabaseClient get client => Supabase.instance.client;
 
-  Future<void> initialize() async {
-    // Placeholder: call Supabase.initialize(...) once auth/data layer is wired.
+  static User? get currentUser => client.auth.currentUser;
+
+  static Stream<AuthState> get onAuthStateChange =>
+      client.auth.onAuthStateChange;
+
+  static Future<void> signInWithGoogle() async {
+    await client.auth.signInWithOAuth(
+      OAuthProvider.google,
+      redirectTo: 'com.cricstatz.cricstatz://login-callback',
+      authScreenLaunchMode: LaunchMode.externalApplication,
+    );
+  }
+
+  static Future<void> signOut() async {
+    await client.auth.signOut();
   }
 }
