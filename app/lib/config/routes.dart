@@ -1,3 +1,5 @@
+import 'package:cricstatz/screens/auth/login_screen.dart';
+import 'package:cricstatz/screens/auth/profile_setup_screen.dart';
 import 'package:cricstatz/screens/home/home_screen.dart';
 import 'package:cricstatz/screens/match/create_match_screen.dart';
 import 'package:cricstatz/screens/match/match_list_screen.dart';
@@ -10,6 +12,8 @@ import 'package:cricstatz/screens/teams/team_list_screen.dart';
 import 'package:flutter/material.dart';
 
 class AppRoutes {
+  static const String login = '/login';
+  static const String profileSetup = '/profile-setup';
   static const String home = '/';
   static const String teams = '/teams';
   static const String createTeam = '/teams/create';
@@ -21,7 +25,8 @@ class AppRoutes {
   static const String matchStats = '/stats/match';
 
   static Map<String, WidgetBuilder> get routeTable => {
-        home: (_) => const HomeScreen(),
+        login: (_) => const LoginScreen(),
+        profileSetup: (_) => const ProfileSetupScreen(),
         teams: (_) => const TeamListScreen(),
         createTeam: (_) => const CreateTeamScreen(),
         matches: (_) => const MatchListScreen(),
