@@ -26,7 +26,11 @@ class AppBottomNavBar extends StatelessWidget {
           case 2:
           case 3:
           case 4:
-            Navigator.pushNamed(context, AppRoutes.toss);
+            if (index == 4) {
+              Navigator.pushNamed(context, AppRoutes.profile);
+            } else {
+              Navigator.pushNamed(context, AppRoutes.toss);
+            }
             break;
         }
       },

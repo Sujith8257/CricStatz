@@ -1,13 +1,47 @@
-import 'dart:ui';
-
 import 'package:cricstatz/config/palette.dart';
 import 'package:cricstatz/config/routes.dart';
+import 'package:cricstatz/models/match.dart';
+import 'package:cricstatz/services/match_service.dart';
+import 'package:cricstatz/widgets/skeleton_loaders.dart';
 import 'package:flutter/material.dart';
+import 'dart:ui' show ImageFilter;
 
-class MatchInfoScreen extends StatelessWidget {
-  const MatchInfoScreen({super.key});
+class MatchInfoScreen extends StatefulWidget {
+  final String? matchId;
+  const MatchInfoScreen({super.key, this.matchId});
 
-  // Figma (141:1928) image assets (valid for limited time).
+  @override
+  State<MatchInfoScreen> createState() => _MatchInfoScreenState();
+}
+
+class _MatchInfoScreenState extends State<MatchInfoScreen> {
+  Match? _match;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    if (widget.matchId == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+    try {
+      final match = await MatchService.getMatchDetails(widget.matchId!);
+      if (mounted) {
+        setState(() {
+          _match = match;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   static const _stadiumImg =
       'https://www.figma.com/api/mcp/asset/33423223-3ca2-4619-8967-429d142aa978';
   static const _mapImg =
@@ -31,21 +65,23 @@ class MatchInfoScreen extends StatelessWidget {
             child: Column(
               children: [
                 _buildHeader(context),
-                _buildTabs(context),
+                _buildTabs(context, widget.matchId),
                 const SizedBox(height: 16),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      _buildMatchSummaryCard(context),
-                      const SizedBox(height: 16),
-                      _buildVenueDetailsCard(context),
-                      const SizedBox(height: 16),
-                      _buildWeatherPitchRow(context),
-                      const SizedBox(height: 16),
-                      _buildHeadToHeadCard(context),
-                    ],
-                  ),
+                  child: _isLoading 
+                      ? const MatchInfoLoader()
+                      : Column(
+                          children: [
+                            _buildMatchSummaryCard(context),
+                            const SizedBox(height: 16),
+                            _buildVenueDetailsCard(context),
+                            const SizedBox(height: 16),
+                            _buildWeatherPitchRow(context),
+                            const SizedBox(height: 16),
+                            _buildHeadToHeadCard(context),
+                          ],
+                        ),
                 ),
               ],
             ),
@@ -84,7 +120,7 @@ class MatchInfoScreen extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'IND vs AUS, Final',
+                      '${_match?.teamAId ?? "Loading..."} vs ${_match?.teamBId ?? ""}',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             color: AppPalette.textPrimary,
                             fontWeight: FontWeight.w700,
@@ -93,7 +129,7 @@ class MatchInfoScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'ODI World Cup 2023',
+                      _match?.matchFormat ?? 'Match Info',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: const Color(0xFFCBD5E1),
                             fontWeight: FontWeight.w500,
@@ -116,7 +152,7 @@ class MatchInfoScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTabs(BuildContext context) {
+  Widget _buildTabs(BuildContext context, String? matchId) {
     const tabs = ['INFO', 'LIVE', 'SCORECARD', 'PLAYERS'];
     const selectedIndex = 0;
 
@@ -137,11 +173,11 @@ class MatchInfoScreen extends StatelessWidget {
                   onTap: () {
                     if (i == selectedIndex) return;
                     if (i == 1) {
-                      Navigator.pushNamed(context, AppRoutes.live);
+                      Navigator.pushNamed(context, AppRoutes.live, arguments: matchId);
                     } else if (i == 2) {
-                      Navigator.pushNamed(context, AppRoutes.scoreboard);
+                      Navigator.pushNamed(context, AppRoutes.scoreboard, arguments: matchId);
                     } else if (i == 3) {
-                      Navigator.pushNamed(context, AppRoutes.players);
+                      Navigator.pushNamed(context, AppRoutes.players, arguments: matchId);
                     }
                   },
                   child: Container(
@@ -343,10 +379,10 @@ class MatchInfoScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          row('Venue', 'Narendra Modi Stadium'),
-          row('City', 'Ahmedabad, India'),
-          row('Capacity', '132,000'),
-          row('Ends', 'Adani Exhibition End, Reliance End', last: true),
+          row('Venue', _match?.venue ?? 'TBD'),
+          row('City', _match?.venueCity ?? 'TBD'),
+          row('Capacity', _match?.venueCapacity ?? 'TBD'),
+          row('Ends', _match?.venueEnds ?? 'TBD', last: true),
           const SizedBox(height: 16),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
@@ -419,7 +455,7 @@ class MatchInfoScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                '32°C',
+                _match?.weatherTemp ?? '--°C',
                 style: Theme.of(context).textTheme.displaySmall?.copyWith(
                       color: AppPalette.textPrimary,
                       fontWeight: FontWeight.w700,
@@ -428,7 +464,7 @@ class MatchInfoScreen extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Haze & Sunny',
+                _match?.weatherDesc ?? 'N/A',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppPalette.textMuted,
                       fontWeight: FontWeight.w600,
@@ -442,7 +478,7 @@ class MatchInfoScreen extends StatelessWidget {
                       size: 14, color: AppPalette.textMuted),
                   const SizedBox(width: 4),
                   Text(
-                    'Humidity: 42%',
+                    'Humidity: ${_match?.humidity ?? "--%"}',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: AppPalette.textMuted,
                         ),
@@ -461,7 +497,7 @@ class MatchInfoScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                'Balanced',
+                _match?.pitchType ?? 'Balanced',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: AppPalette.textPrimary,
                       fontWeight: FontWeight.w700,
@@ -469,7 +505,7 @@ class MatchInfoScreen extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Spin friendly',
+                _match?.pitchDesc ?? 'Spin friendly',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppPalette.textMuted,
                       fontWeight: FontWeight.w600,
@@ -484,12 +520,12 @@ class MatchInfoScreen extends StatelessWidget {
                   child: Row(
                     children: [
                       Expanded(
-                        flex: 40,
+                        flex: _match?.paceRatio ?? 50,
                         child: Container(color: AppPalette.progress),
                       ),
                       Expanded(
-                        flex: 60,
-                        child: Container(color: Color(0xFFF97316)),
+                        flex: _match?.spinRatio ?? 50,
+                        child: Container(color: const Color(0xFFF97316)),
                       ),
                     ],
                   ),
@@ -500,13 +536,13 @@ class MatchInfoScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Pace 40%',
+                    'Pace ${_match?.paceRatio ?? 50}%',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: AppPalette.textMuted,
                         ),
                   ),
                   Text(
-                    'Spin 60%',
+                    'Spin ${_match?.spinRatio ?? 50}%',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: AppPalette.textMuted,
                         ),
@@ -634,7 +670,7 @@ class MatchInfoScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '4',
+                      '${_match?.headToHeadA ?? 0}',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             color: const Color(0xFF60A5FA),
                             fontWeight: FontWeight.w700,
@@ -673,7 +709,7 @@ class MatchInfoScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '6',
+                      '${_match?.headToHeadB ?? 0}',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             color: const Color(0xFF60A5FA),
                             fontWeight: FontWeight.w700,

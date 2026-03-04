@@ -3,48 +3,28 @@ import 'dart:ui';
 import 'package:cricstatz/config/assets.dart';
 import 'package:cricstatz/config/palette.dart';
 import 'package:cricstatz/config/routes.dart';
+import 'package:cricstatz/models/match.dart';
+import 'package:cricstatz/services/match_service.dart';
 import 'package:cricstatz/widgets/app_bottom_nav_bar.dart';
 import 'package:cricstatz/widgets/app_header.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
-class UpcomingFixturesScreen extends StatelessWidget {
+class UpcomingFixturesScreen extends StatefulWidget {
   const UpcomingFixturesScreen({super.key});
 
-  static const _fixtures = [
-    _FixtureData(
-      time: 'Tomorrow, 14:00',
-      teamA: 'INDIA',
-      teamB: 'AUSTRALIA',
-      teamAFlag: AppAssets.flagInd,
-      teamBFlag: AppAssets.flagAus,
-      venue: 'Narendra Modi Stadium, Ahmedabad',
-      format: 'T20',
-      formatColor: Color(0xFF0A1F43),
-      hasStartMatch: true,
-    ),
-    _FixtureData(
-      time: 'Sat, 24 June • 09:30',
-      teamA: 'ENGLAND',
-      teamB: 'SOUTH AFRICA',
-      teamAFlag: AppAssets.flagEng,
-      teamBFlag: AppAssets.flagRsa,
-      venue: "Lord's Cricket Ground, London",
-      format: 'ODI',
-      formatColor: Color(0xFF334155),
-      hasStartMatch: false,
-    ),
-    _FixtureData(
-      time: 'Sun, 25 June • 11:00',
-      teamA: 'NEW ZEALAND',
-      teamB: 'PAKISTAN',
-      teamAFlag: AppAssets.flagNzl,
-      teamBFlag: AppAssets.flagPak,
-      venue: 'Hagley Oval, Christchurch',
-      format: 'TEST',
-      formatColor: Color(0xFFDC2626),
-      hasStartMatch: false,
-    ),
-  ];
+  @override
+  State<UpcomingFixturesScreen> createState() => _UpcomingFixturesScreenState();
+}
+
+class _UpcomingFixturesScreenState extends State<UpcomingFixturesScreen> {
+  late Future<List<Match>> _matchesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _matchesFuture = MatchService.getUpcomingMatches();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,48 +37,55 @@ class UpcomingFixturesScreen extends StatelessWidget {
             children: [
               _buildHeader(context),
               Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: FutureBuilder<List<Match>>(
+                  future: _matchesFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(color: AppPalette.accent),
+                      );
+                    }
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Text(
+                          'Failed to load fixtures: ${snapshot.error}',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      );
+                    }
+                    final matches = snapshot.data ?? [];
+                    if (matches.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'No upcoming fixtures found.',
+                          style: TextStyle(color: AppPalette.textMuted),
+                        ),
+                      );
+                    }
+                    return ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
                       children: [
-                        Text(
-                          'International Fixtures',
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Fixtures',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                     color: AppPalette.textPrimary,
                                     fontWeight: FontWeight.w700,
                                     fontSize: 18,
                                   ),
+                            ),
+                          ],
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppPalette.accent.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'T20 WORLD CUP',
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(
-                                  color: AppPalette.accent,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                ),
-                          ),
-                        ),
+                        const SizedBox(height: 16),
+                        ...matches.map((match) => Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: _FixtureCard(match: match),
+                            )),
                       ],
-                    ),
-                    const SizedBox(height: 16),
-                    ..._fixtures.map((f) => Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: _FixtureCard(data: f),
-                        )),
-                  ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -238,37 +225,49 @@ class _TabItem extends StatelessWidget {
   }
 }
 
-class _FixtureData {
-  const _FixtureData({
-    required this.time,
-    required this.teamA,
-    required this.teamB,
-    required this.teamAFlag,
-    required this.teamBFlag,
-    required this.venue,
-    required this.format,
-    required this.formatColor,
-    required this.hasStartMatch,
-  });
-
-  final String time;
-  final String teamA;
-  final String teamB;
-  final String teamAFlag;
-  final String teamBFlag;
-  final String venue;
-  final String format;
-  final Color formatColor;
-  final bool hasStartMatch;
-}
 
 class _FixtureCard extends StatelessWidget {
-  const _FixtureCard({required this.data});
+  const _FixtureCard({required this.match});
 
-  final _FixtureData data;
+  final Match match;
+
+  static Color _getFormatColor(String? format) {
+    switch (format?.toUpperCase()) {
+      case 'T20':
+        return const Color(0xFF0A1F43);
+      case 'ODI':
+        return const Color(0xFF334155);
+      case 'TEST':
+        return const Color(0xFFDC2626);
+      default:
+        return const Color(0xFF1E293B);
+    }
+  }
+
+  static String _getFlagForTeam(String? teamName) {
+    if (teamName == null) return AppAssets.flagInd;
+    final name = teamName.toUpperCase();
+    if (name.contains('INDIA')) return AppAssets.flagInd;
+    if (name.contains('AUSTRALIA')) return AppAssets.flagAus;
+    if (name.contains('ENGLAND')) return AppAssets.flagEng;
+    if (name.contains('SOUTH AFRICA')) return AppAssets.flagRsa;
+    if (name.contains('NEW ZEALAND')) return AppAssets.flagNzl;
+    if (name.contains('PAKISTAN')) return AppAssets.flagPak;
+    return AppAssets.flagInd; // Default
+  }
 
   @override
   Widget build(BuildContext context) {
+    final matchTime = match.matchDate != null
+        ? DateFormat('EEE, d MMM • HH:mm').format(match.matchDate!)
+        : 'Date TBD';
+    final formatColor = _getFormatColor(match.matchFormat);
+    final teamAFlag = _getFlagForTeam(match.teamAId);
+    final teamBFlag = _getFlagForTeam(match.teamBId);
+    final isToday = match.matchDate != null &&
+        DateTime.now().difference(match.matchDate!).inHours.abs() < 24;
+    final isLive = match.status == 'live';
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1C2431),
@@ -296,7 +295,7 @@ class _FixtureCard extends StatelessWidget {
                         color: AppPalette.textMuted),
                     const SizedBox(width: 8),
                     Text(
-                      data.time.toUpperCase(),
+                      matchTime.toUpperCase(),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                             color: AppPalette.textMuted,
                             fontWeight: FontWeight.w700,
@@ -309,11 +308,11 @@ class _FixtureCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: data.formatColor,
+                    color: formatColor,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    data.format,
+                    match.matchFormat ?? 'T20',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
@@ -333,10 +332,10 @@ class _FixtureCard extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _TeamBadge(assetPath: data.teamAFlag),
+                      _TeamBadge(assetPath: teamAFlag),
                       const SizedBox(height: 6),
                       Text(
-                        data.teamA,
+                        match.teamAId.toUpperCase(),
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: AppPalette.textPrimary,
                               fontWeight: FontWeight.w700,
@@ -363,10 +362,10 @@ class _FixtureCard extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _TeamBadge(assetPath: data.teamBFlag),
+                      _TeamBadge(assetPath: teamBFlag),
                       const SizedBox(height: 6),
                       Text(
-                        data.teamB,
+                        match.teamBId.toUpperCase(),
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: AppPalette.textPrimary,
                               fontWeight: FontWeight.w700,
@@ -394,7 +393,7 @@ class _FixtureCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        data.venue,
+                        match.venue ?? 'Venue TBD',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: AppPalette.textMuted, fontSize: 12),
                       ),
@@ -406,49 +405,72 @@ class _FixtureCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: FilledButton.icon(
-                        onPressed: data.hasStartMatch
-                            ? () => Navigator.pushNamed(context, AppRoutes.toss)
-                            : () => ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Reminder set!'))),
+                        onPressed: isLive
+                            ? () {
+                                // Any scorer can join an already-live match
+                                Navigator.pushNamed(
+                                  context,
+                                  AppRoutes.liveUpdate,
+                                  arguments: {
+                                    'match': match,
+                                    'tossWinner': match.tossWinner,
+                                    'decision': match.tossDecision,
+                                  },
+                                );
+                              }
+                            : isToday
+                                ? () => _showStartConfirmation(context, match)
+                                : () => ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Reminder set!'),
+                                      ),
+                                    ),
                         icon: Icon(
-                          data.hasStartMatch
-                              ? Icons.play_arrow
-                              : Icons.notifications_outlined,
-                          size: data.hasStartMatch ? 14 : 16,
-                          color: data.hasStartMatch
+                          isLive
+                              ? Icons.sports_cricket_outlined
+                              : (isToday
+                                  ? Icons.play_arrow
+                                  : Icons.notifications_outlined),
+                          size: 16,
+                          color: isLive || isToday
                               ? AppPalette.bgSecondary
                               : AppPalette.accent,
                         ),
                         label: Text(
-                          data.hasStartMatch
-                              ? 'Start Match'
-                              : 'Set Reminder',
+                          isLive
+                              ? 'Update Score'
+                              : (isToday ? 'Start Match' : 'Set Reminder'),
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         style: FilledButton.styleFrom(
-                          backgroundColor: data.hasStartMatch
+                          backgroundColor: isLive || isToday
                               ? AppPalette.accent
                               : AppPalette.accent.withValues(alpha: 0.2),
-                          foregroundColor: data.hasStartMatch
+                          foregroundColor: isLive || isToday
                               ? AppPalette.bgSecondary
                               : AppPalette.accent,
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     OutlinedButton(
-                      onPressed: () =>
-                          Navigator.pushNamed(context, AppRoutes.info),
+                      onPressed: () => Navigator.pushNamed(
+                        context,
+                        AppRoutes.info,
+                        arguments: match,
+                      ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppPalette.textPrimary,
                         side: const BorderSide(color: Color(0xFF2D3748)),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         minimumSize: const Size(0, 40),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       child: const Text('Details'),
                     ),
@@ -456,6 +478,39 @@ class _FixtureCard extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showStartConfirmation(BuildContext context, Match match) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppPalette.bgSecondary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Start Match?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Text(
+          'Are you sure you want to start ${match.teamAId} vs ${match.teamBId} at ${match.venue}?',
+          style: const TextStyle(color: AppPalette.textMuted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL', style: TextStyle(color: AppPalette.textMuted)),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(
+                context,
+                AppRoutes.toss,
+                arguments: match,
+              );
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppPalette.accent),
+            child: const Text('START', style: TextStyle(color: AppPalette.bgSecondary, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

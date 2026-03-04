@@ -1,15 +1,18 @@
-import 'dart:ui';
-
 import 'package:cricstatz/config/palette.dart';
 import 'package:cricstatz/config/routes.dart';
+import 'package:cricstatz/models/match.dart';
+import 'package:cricstatz/services/match_service.dart';
+import 'package:cricstatz/widgets/skeleton_loaders.dart';
 import 'package:flutter/material.dart';
+import 'dart:ui';
 
 const Color _playersBg = AppPalette.bgPrimary;
 const Color _playersStroke = Color(0xFF1E293B);
 const Color _playersSegBg = Color(0xFF1E293B);
 
 class MatchPlayersScreen extends StatefulWidget {
-  const MatchPlayersScreen({super.key});
+  final String? matchId;
+  const MatchPlayersScreen({super.key, this.matchId});
 
   @override
   State<MatchPlayersScreen> createState() => _MatchPlayersScreenState();
@@ -17,6 +20,36 @@ class MatchPlayersScreen extends StatefulWidget {
 
 class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
   bool _isIndiaSelected = true;
+  Map<String, dynamic>? _playersData;
+  bool _isLoading = true;
+  Match? _match;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    if (widget.matchId == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+    try {
+      final results = await Future.wait([
+        MatchService.getMatchDetails(widget.matchId!),
+        MatchService.getMatchPlayers(widget.matchId!),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _match = results[0] as Match;
+        _playersData = results[1] as Map<String, dynamic>;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   // Figma (142:2940) image assets (valid for limited time).
   static const _imgRohit =
@@ -50,14 +83,21 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
           child: Column(
             children: [
               _buildTopBar(context),
-              _buildTabs(context),
+              _buildTabs(context, widget.matchId),
               const SizedBox(height: 16),
               _buildTeamSelector(context),
               const SizedBox(height: 16),
-              _buildPlayingXIHeader(context),
-              _buildPlayersList(context),
-              const SizedBox(height: 24),
-              _buildBenchSection(context),
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: PlayersListLoader(),
+                )
+              else ...[
+                _buildPlayingXIHeader(context),
+                _buildPlayersList(context),
+                const SizedBox(height: 24),
+                _buildBenchSection(context),
+              ],
             ],
           ),
         ),
@@ -66,6 +106,9 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
   }
 
   Widget _buildTopBar(BuildContext context) {
+    final teamA = _match?.teamAId ?? 'Team A';
+    final teamB = _match?.teamBId ?? 'Team B';
+    final subtitle = _match?.matchFormat ?? 'Match Squads';
     // Match the same navbar style as `scoreboard.dart`.
     return ClipRect(
       child: BackdropFilter(
@@ -95,7 +138,7 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'IND vs AUS, Final',
+                      '$teamA vs $teamB',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             color: AppPalette.textPrimary,
                             fontWeight: FontWeight.w700,
@@ -104,7 +147,7 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'ODI World Cup 2023',
+                      subtitle,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: const Color(0xFFCBD5E1),
                             fontWeight: FontWeight.w500,
@@ -127,7 +170,7 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
     );
   }
 
-  Widget _buildTabs(BuildContext context) {
+  Widget _buildTabs(BuildContext context, String? matchId) {
     const tabs = ['INFO', 'LIVE', 'SCORECARD', 'PLAYERS'];
     const selectedIndex = 3;
 
@@ -148,11 +191,11 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
                   onTap: () {
                     if (i == selectedIndex) return;
                     if (i == 0) {
-                      Navigator.pushNamed(context, AppRoutes.info);
+                      Navigator.pushNamed(context, AppRoutes.info, arguments: matchId);
                     } else if (i == 1) {
-                      Navigator.pushNamed(context, AppRoutes.live);
+                      Navigator.pushNamed(context, AppRoutes.live, arguments: matchId);
                     } else if (i == 2) {
-                      Navigator.pushNamed(context, AppRoutes.scoreboard);
+                      Navigator.pushNamed(context, AppRoutes.scoreboard, arguments: matchId);
                     }
                   },
                   child: Container(
@@ -295,67 +338,14 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
   }
 
   Widget _buildPlayersList(BuildContext context) {
-    final players = _isIndiaSelected
-        ? const [
-            _PlayerRowData(
-              name: 'Rohit\nSharma',
-              role: 'Top-order Batter',
-              stat: '47 (31)',
-              subStat: 'S/R: 151.6',
-              badge: 'C',
-              badgeBg: Color(0xFFFACC15),
-              badgeFg: AppPalette.bgSecondary,
-              imageUrl: _imgRohit,
-            ),
-            _PlayerRowData(
-              name: 'KL Rahul',
-              role: 'Wicketkeeper Batter',
-              stat: '66 (107)',
-              subStat: 'S/R: 61.7',
-              badge: 'WK',
-              badgeBg: Color(0xFF475569),
-              badgeFg: Colors.white,
-              imageUrl: _imgRahul,
-            ),
-            _PlayerRowData(
-              name: 'Virat Kohli',
-              role: 'Middle-order Batter',
-              stat: '54 (63)',
-              subStat: 'S/R: 85.7',
-              badge: 'VC',
-              badgeBg: AppPalette.bgSecondary,
-              badgeFg: Colors.white,
-              imageUrl: _imgKohli,
-            ),
-            _PlayerRowData(
-              name: 'Mohammed Shami',
-              role: 'Right-arm Fast',
-              stat: '1/47 (7.0)',
-              subStat: 'ECON: 6.71',
-              badge: null,
-              imageUrl: _imgShami,
-            ),
-            _PlayerRowData(
-              name: 'Jasprit Bumrah',
-              role: 'Right-arm Fast',
-              stat: '2/43 (9.0)',
-              subStat: 'ECON: 4.78',
-              badge: null,
-              imageUrl: _imgBumrah,
-            ),
-          ]
-        : const [
-            _PlayerRowData(
-              name: 'Travis Head',
-              role: 'Top-order Batter',
-              stat: '137 (120)',
-              subStat: 'S/R: 114.1',
-              badge: 'C',
-              badgeBg: Color(0xFFFACC15),
-              badgeFg: AppPalette.bgSecondary,
-              imageUrl: _imgRohit,
-            ),
-          ];
+    final players = (_playersData?['playingXI'] as List<dynamic>?)?.map((p) => _PlayerRowData(
+      name: p['name'],
+      role: p['role'],
+      stat: p['stat'] ?? '',
+      subStat: p['subStat'] ?? '',
+      badge: p['badge'],
+      imageUrl: p['imageUrl'] ?? '',
+    )).toList() ?? [];
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -374,23 +364,11 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
   }
 
   Widget _buildBenchSection(BuildContext context) {
-    final bench = const [
-      _BenchRowData(
-        name: 'Ishan Kishan',
-        role: 'Wicketkeeper Batter',
-        imageUrl: _imgIshan,
-      ),
-      _BenchRowData(
-        name: 'Ravichandran Ashwin',
-        role: 'Bowling All-rounder',
-        imageUrl: _imgAshwin,
-      ),
-      _BenchRowData(
-        name: 'Prasidh Krishna',
-        role: 'Right-arm Fast',
-        imageUrl: _imgPrasidh,
-      ),
-    ];
+    final bench = (_playersData?['bench'] as List<dynamic>?)?.map((p) => _BenchRowData(
+      name: p['name'],
+      role: p['role'],
+      imageUrl: p['imageUrl'] ?? '',
+    )).toList() ?? [];
 
     return Container(
       width: double.infinity,

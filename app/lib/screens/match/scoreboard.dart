@@ -1,25 +1,59 @@
-import 'dart:ui';
-
 import 'package:cricstatz/config/palette.dart';
 import 'package:cricstatz/config/routes.dart';
+import 'package:cricstatz/models/match.dart';
+import 'package:cricstatz/models/match_stats.dart';
+import 'package:cricstatz/services/match_service.dart';
+import 'package:cricstatz/widgets/skeleton_loaders.dart';
 import 'package:flutter/material.dart';
+import 'dart:ui';
 
 class MatchScoreboardScreen extends StatefulWidget {
-  const MatchScoreboardScreen({super.key});
+  final String? matchId;
+  const MatchScoreboardScreen({super.key, this.matchId});
 
   @override
   State<MatchScoreboardScreen> createState() => _MatchScoreboardScreenState();
 
   static const Color _card = Color(0xFF0F172A);
   static const Color _stroke = Color(0xFF1E293B);
-  static const Color _headerOverlay = Color(0x660A1F43); // ~40% of #0A1F43
+  static const Color _headerOverlay = Color(0x660A1F43);
   static const Color _rowOverlay = Color(0x330D1729);
   static const Color _accentBlue = Color(0xFF60A5FA);
-  static const Color _ausHeaderBg = Color(0x333E60AF); // rgba(30,64,175,0.2)
+  static const Color _ausHeaderBg = Color(0x333E60AF);
 }
 
 class _MatchScoreboardScreenState extends State<MatchScoreboardScreen> {
   bool _isAustraliaExpanded = false;
+  List<Map<String, dynamic>>? _scoreboardData;
+  bool _isLoading = true;
+  Match? _match;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    if (widget.matchId == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+    try {
+      final results = await Future.wait([
+        MatchService.getMatchDetails(widget.matchId!),
+        MatchService.getScoreboard(widget.matchId!),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _match = results[0] as Match;
+        _scoreboardData = results[1] as List<Map<String, dynamic>>;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,24 +64,35 @@ class _MatchScoreboardScreenState extends State<MatchScoreboardScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.only(bottom: 24),
             child: Column(
-              children: [
-                _TopBar(),
-                const _Tabs(selectedIndex: 2),
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      const _InningsSummaryBar(),
-                      const SizedBox(height: 10),
-                      const _BattingTable(),
-                      const _ExtrasTotal(),
-                      const SizedBox(height: 12),
-                      const _FallOfWickets(),
-                      const SizedBox(height: 12),
-                      const _BowlingTable(),
-                      const SizedBox(height: 16),
-                      const _KeyPartnerships(),
+                children: [
+                 _TopBar(match: _match),
+                 _Tabs(selectedIndex: 2, matchId: widget.matchId),
+                 const SizedBox(height: 16),
+                 Padding(
+                   padding: const EdgeInsets.symmetric(horizontal: 16),
+                   child: _isLoading 
+                      ? const Column(
+                          children: [
+                            SkeletonLoader(width: double.infinity, height: 60),
+                            SizedBox(height: 16),
+                            SkeletonLoader(width: double.infinity, height: 300),
+                          ],
+                        )
+                      : Column(
+                          children: [
+                            if (_scoreboardData != null && _scoreboardData!.isNotEmpty) ...[
+                              _InningsSummaryBar(title: _scoreboardData![0]['innings'] as String, total: _scoreboardData![0]['total'] as String),
+                              const SizedBox(height: 10),
+                              _BattingTable(batsmen: _scoreboardData![0]['batting'] as List<BatsmanScore>),
+                              const _ExtrasTotal(),
+                              const SizedBox(height: 12),
+                              // Fall of wickets could also be dynamic
+                              const _FallOfWickets(),
+                              const SizedBox(height: 12),
+                              _BowlingTable(bowlers: _scoreboardData![0]['bowling'] as List<BowlerScore>),
+                            ],
+                            const SizedBox(height: 16),
+                            const _KeyPartnerships(),
                       const SizedBox(height: 18),
                       _AustraliaInningsHeader(
                         expanded: _isAustraliaExpanded,
@@ -77,8 +122,14 @@ class _MatchScoreboardScreenState extends State<MatchScoreboardScreen> {
 }
 
 class _TopBar extends StatelessWidget {
+  final Match? match;
+  const _TopBar({this.match});
+  
   @override
   Widget build(BuildContext context) {
+    final teamA = match?.teamAId ?? 'Team A';
+    final teamB = match?.teamBId ?? 'Team B';
+    final subtitle = match?.matchFormat ?? 'Match Scorecard';
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
@@ -97,8 +148,11 @@ class _TopBar extends StatelessWidget {
                   AppRoutes.home,
                   (route) => false,
                 ),
-                icon: const Icon(Icons.arrow_back_ios_new,
-                    color: AppPalette.textPrimary, size: 20),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new,
+                  color: AppPalette.textPrimary,
+                  size: 20,
+                ),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
               ),
@@ -107,7 +161,7 @@ class _TopBar extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'IND vs AUS, Final',
+                      '$teamA vs $teamB',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             color: AppPalette.textPrimary,
                             fontWeight: FontWeight.w700,
@@ -116,7 +170,7 @@ class _TopBar extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'ODI World Cup 2023',
+                      subtitle,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: const Color(0xFFCBD5E1),
                             fontWeight: FontWeight.w500,
@@ -127,8 +181,11 @@ class _TopBar extends StatelessWidget {
               ),
               IconButton(
                 onPressed: () {},
-                icon: const Icon(Icons.share_outlined,
-                    color: AppPalette.textPrimary, size: 20),
+                icon: const Icon(
+                  Icons.share_outlined,
+                  color: AppPalette.textPrimary,
+                  size: 20,
+                ),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
               ),
@@ -141,9 +198,10 @@ class _TopBar extends StatelessWidget {
 }
 
 class _Tabs extends StatelessWidget {
-  const _Tabs({required this.selectedIndex});
+  const _Tabs({required this.selectedIndex, this.matchId});
 
   final int selectedIndex;
+  final String? matchId;
 
   @override
   Widget build(BuildContext context) {
@@ -165,13 +223,13 @@ class _Tabs extends StatelessWidget {
                   onTap: () {
                     if (i == selectedIndex) return;
                     if (i == 0) {
-                      Navigator.pushNamed(context, AppRoutes.info);
+                      Navigator.pushNamed(context, AppRoutes.info, arguments: matchId);
                     } else if (i == 1) {
-                      Navigator.pushNamed(context, AppRoutes.live);
+                      Navigator.pushNamed(context, AppRoutes.live, arguments: matchId);
                     } else if (i == 2) {
-                      // Already on scorecard (this screen).
+                      // Already on scorecard
                     } else if (i == 3) {
-                      Navigator.pushNamed(context, AppRoutes.players);
+                      Navigator.pushNamed(context, AppRoutes.players, arguments: matchId);
                     }
                   },
                   child: Container(
@@ -210,7 +268,9 @@ class _Tabs extends StatelessWidget {
 }
 
 class _InningsSummaryBar extends StatelessWidget {
-  const _InningsSummaryBar();
+  final String title;
+  final String total;
+  const _InningsSummaryBar({required this.title, required this.total});
 
   @override
   Widget build(BuildContext context) {
@@ -232,9 +292,9 @@ class _InningsSummaryBar extends StatelessWidget {
               border: Border.all(color: const Color(0x1AFFFFFF)),
             ),
             alignment: Alignment.center,
-            child: const Text(
-              'IND',
-              style: TextStyle(
+            child: Text(
+              title.substring(0, title.length > 3 ? 3 : title.length).toUpperCase(),
+              style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w800,
                 fontSize: 10,
@@ -244,7 +304,7 @@ class _InningsSummaryBar extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'India 1st Innings',
+              title,
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     color: AppPalette.textPrimary,
                     fontWeight: FontWeight.w700,
@@ -252,18 +312,10 @@ class _InningsSummaryBar extends StatelessWidget {
             ),
           ),
           Text(
-            '240',
+            total,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   color: AppPalette.textPrimary,
                   fontWeight: FontWeight.w800,
-                ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            '(50.0)',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppPalette.textMuted,
-                  fontWeight: FontWeight.w600,
                 ),
           ),
         ],
@@ -273,7 +325,8 @@ class _InningsSummaryBar extends StatelessWidget {
 }
 
 class _BattingTable extends StatelessWidget {
-  const _BattingTable();
+  final List<BatsmanScore> batsmen;
+  const _BattingTable({required this.batsmen});
 
   @override
   Widget build(BuildContext context) {
@@ -379,38 +432,14 @@ class _BattingTable extends StatelessWidget {
               ],
             ),
           ),
-          row(
-            name: 'Rohit Sharma (c)',
-            dismissal: 'c Head b Maxwell',
-            r: '47',
-            b: '31',
-            f4: '4',
-            f6: '3',
-          ),
-          row(
-            name: 'Shubman Gill',
-            dismissal: 'c Zampa b Starc',
-            r: '4',
-            b: '7',
-            f4: '0',
-            f6: '0',
-          ),
-          row(
-            name: 'Virat Kohli',
-            dismissal: 'b Cummins',
-            r: '54',
-            b: '63',
-            f4: '4',
-            f6: '0',
-          ),
-          row(
-            name: 'KL Rahul (wk)',
-            dismissal: 'c Inglis b Starc',
-            r: '66',
-            b: '107',
-            f4: '1',
-            f6: '0',
-          ),
+          ...batsmen.map((b) => row(
+            name: b.name,
+            dismissal: 'dismissed', // Should be dynamic
+            r: b.runs,
+            b: b.balls,
+            f4: b.fours.toString(),
+            f6: b.sixes.toString(),
+          )),
         ],
       ),
     );
@@ -596,7 +625,8 @@ class _FallOfWickets extends StatelessWidget {
 }
 
 class _BowlingTable extends StatelessWidget {
-  const _BowlingTable();
+  final List<BowlerScore> bowlers;
+  const _BowlingTable({required this.bowlers});
 
   @override
   Widget build(BuildContext context) {
@@ -667,9 +697,7 @@ class _BowlingTable extends StatelessWidget {
               ],
             ),
           ),
-          row('Mitchell Starc', '10', '0', '55', '3', '5.50'),
-          row('Josh Hazlewood', '10', '0', '60', '2', '6.00'),
-          row('Pat Cummins', '10', '0', '34', '2', '3.40'),
+          ...bowlers.map((b) => row(b.name, b.overs, b.maidens, b.runs, b.wickets, b.econ)),
         ],
       ),
     );

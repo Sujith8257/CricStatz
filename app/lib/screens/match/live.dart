@@ -1,9 +1,12 @@
-import 'dart:ui';
-
 import 'package:cricstatz/config/palette.dart';
 import 'package:cricstatz/config/assets.dart';
 import 'package:cricstatz/config/routes.dart';
+import 'package:cricstatz/models/match.dart';
+import 'package:cricstatz/models/match_stats.dart';
+import 'package:cricstatz/services/match_service.dart';
+import 'package:cricstatz/widgets/skeleton_loaders.dart';
 import 'package:flutter/material.dart';
+import 'dart:ui' show ImageFilter;
 
 // ─── Color Constants ───────────────────────────────────────────────────────────
 class AppColors {
@@ -22,8 +25,44 @@ class AppColors {
 }
 
 // ─── Main Screen ───────────────────────────────────────────────────────────────
-class LiveMatchScreen extends StatelessWidget {
-  const LiveMatchScreen({super.key});
+class LiveMatchScreen extends StatefulWidget {
+  final String? matchId;
+  const LiveMatchScreen({super.key, this.matchId});
+
+  @override
+  State<LiveMatchScreen> createState() => _LiveMatchScreenState();
+}
+
+class _LiveMatchScreenState extends State<LiveMatchScreen> {
+  Match? _match;
+  Map<String, dynamic>? _liveData;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    if (widget.matchId == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+    try {
+      final match = await MatchService.getMatchDetails(widget.matchId!);
+      final stats = await MatchService.getLiveScore(widget.matchId!);
+      if (mounted) {
+        setState(() {
+          _match = match;
+          _liveData = stats;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,15 +76,22 @@ class LiveMatchScreen extends StatelessWidget {
               child: Column(
                 children: [
                   _buildHeader(context),
-                  _buildTabs(context),
+                  _buildTabs(context, widget.matchId),
                   const SizedBox(height: 16),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
-                      children: const [
-                        _ScoreBanner(),
-                        _LiveContent(),
-                        SizedBox(height: 100),
+                      children: [
+                        if (_isLoading)
+                          const ScoreBannerLoader()
+                        else if (_liveData != null) ...[
+                          _ScoreBanner(
+                            match: _match,
+                            summary: _liveData!['summary'] as ScoreSummary,
+                          ),
+                          _LiveContent(data: _liveData!),
+                        ],
+                        const SizedBox(height: 100),
                       ],
                     ),
                   ),
@@ -91,7 +137,7 @@ class LiveMatchScreen extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'IND vs AUS, Final',
+                      '${_match?.teamAId ?? "Lading..."} vs ${_match?.teamBId ?? ""}',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             color: AppPalette.textPrimary,
                             fontWeight: FontWeight.w700,
@@ -100,7 +146,7 @@ class LiveMatchScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'ODI World Cup 2023',
+                      _match?.matchFormat ?? 'Match Details',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: const Color(0xFFCBD5E1),
                             fontWeight: FontWeight.w500,
@@ -127,7 +173,7 @@ class LiveMatchScreen extends StatelessWidget {
   }
 
   /// Tabs row identical to `info.dart` but with LIVE selected.
-  Widget _buildTabs(BuildContext context) {
+  Widget _buildTabs(BuildContext context, String? matchId) {
     const tabs = ['INFO', 'LIVE', 'SCORECARD', 'PLAYERS'];
     const selectedIndex = 1;
 
@@ -148,11 +194,11 @@ class LiveMatchScreen extends StatelessWidget {
                   onTap: () {
                     if (i == selectedIndex) return;
                     if (i == 0) {
-                      Navigator.pushNamed(context, AppRoutes.info);
+                      Navigator.pushNamed(context, AppRoutes.info, arguments: matchId);
                     } else if (i == 2) {
-                      Navigator.pushNamed(context, AppRoutes.scoreboard);
+                      Navigator.pushNamed(context, AppRoutes.scoreboard, arguments: matchId);
                     } else if (i == 3) {
-                      Navigator.pushNamed(context, AppRoutes.players);
+                      Navigator.pushNamed(context, AppRoutes.players, arguments: matchId);
                     }
                   },
                   child: Container(
@@ -192,7 +238,10 @@ class LiveMatchScreen extends StatelessWidget {
 
 // ─── Score Banner ──────────────────────────────────────────────────────────────
 class _ScoreBanner extends StatelessWidget {
-  const _ScoreBanner();
+  final Match? match;
+  final ScoreSummary summary;
+
+  const _ScoreBanner({required this.match, required this.summary});
 
   @override
   Widget build(BuildContext context) {
@@ -247,9 +296,9 @@ class _ScoreBanner extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'INDIA INNINGS',
-                                style: TextStyle(
+                               Text(
+                                summary.inningsName,
+                                style: const TextStyle(
                                   color: AppColors.accent,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
@@ -257,9 +306,9 @@ class _ScoreBanner extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              const Text(
-                                '284/4',
-                                style: TextStyle(
+                              Text(
+                                '${summary.runs}/${summary.wickets}',
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 40,
                                   fontWeight: FontWeight.w900,
@@ -268,16 +317,16 @@ class _ScoreBanner extends StatelessWidget {
                               ),
                               const SizedBox(height: 4),
                               RichText(
-                                text: const TextSpan(
-                                  style: TextStyle(
+                                text: TextSpan(
+                                  style: const TextStyle(
                                       color: AppColors.white80, fontSize: 13),
                                   children: [
-                                    TextSpan(text: 'Overs: 42.3'),
-                                    TextSpan(
+                                    TextSpan(text: 'Overs: ${summary.overs}'),
+                                    const TextSpan(
                                         text: '  •  ',
                                         style: TextStyle(
                                             color: AppColors.white60)),
-                                    TextSpan(text: 'CRR: 6.68'),
+                                    TextSpan(text: 'CRR: ${summary.crr}'),
                                   ],
                                 ),
                               ),
@@ -323,16 +372,17 @@ class _ScoreBanner extends StatelessWidget {
                                     color: AppColors.white60, fontSize: 12),
                               ),
                               const SizedBox(height: 4),
-                              const Text(
-                                'India needs 36 runs in 45 balls',
-                                textAlign: TextAlign.right,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  fontStyle: FontStyle.italic,
+                              if (summary.summaryText != null)
+                                Text(
+                                  summary.summaryText!,
+                                  textAlign: TextAlign.right,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    fontStyle: FontStyle.italic,
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
                         ),
@@ -348,19 +398,19 @@ class _ScoreBanner extends StatelessWidget {
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
+                            children: [
                               Text(
-                                'AUSTRALIA (1ST INNINGS)',
-                                style: TextStyle(
+                                '${match?.teamAId ?? "TEAM"} (1ST INNINGS)',
+                                style: const TextStyle(
                                   color: AppColors.white60,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.8,
                                 ),
                               ),
-                              SizedBox(height: 4),
-                              Text(
-                                '319/10 (50.0)',
+                              const SizedBox(height: 4),
+                              const Text(
+                                '---', // Could be fetched
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w700,
@@ -375,8 +425,8 @@ class _ScoreBanner extends StatelessWidget {
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
-                            children: const [
-                              Text(
+                            children: [
+                              const Text(
                                 'REQUIRED RATE',
                                 style: TextStyle(
                                   color: AppColors.white60,
@@ -385,10 +435,10 @@ class _ScoreBanner extends StatelessWidget {
                                   letterSpacing: 0.8,
                                 ),
                               ),
-                              SizedBox(height: 4),
+                              const SizedBox(height: 4),
                               Text(
-                                '4.80',
-                                style: TextStyle(
+                                summary.reqRate ?? '0.0',
+                                style: const TextStyle(
                                   color: AppColors.accent,
                                   fontWeight: FontWeight.w700,
                                   fontSize: 14,
@@ -452,22 +502,27 @@ class _PulseDotState extends State<_PulseDot>
 
 // ─── Live Content ──────────────────────────────────────────────────────────────
 class _LiveContent extends StatelessWidget {
-  const _LiveContent();
+  final Map<String, dynamic> data;
+  const _LiveContent({required this.data});
 
   @override
   Widget build(BuildContext context) {
+    final partnership = data['partnership'] as Partnership;
+    final batsmen = data['batsmen'] as List<BatsmanScore>;
+    final bowler = data['bowler'] as BowlerScore;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          _PartnershipCard(),
-          SizedBox(height: 16),
-          _MiniScorecards(),
-          SizedBox(height: 16),
-          _BowlerCard(),
-          SizedBox(height: 16),
-          _RecentBalls(),
+        children: [
+          _PartnershipCard(partnership: partnership),
+          const SizedBox(height: 16),
+          _MiniScorecards(batsmen: batsmen),
+          const SizedBox(height: 16),
+          _BowlerCard(bowler: bowler),
+          const SizedBox(height: 16),
+          const _RecentBalls(),
         ],
       ),
     );
@@ -476,7 +531,8 @@ class _LiveContent extends StatelessWidget {
 
 // ─── Partnership Card ──────────────────────────────────────────────────────────
 class _PartnershipCard extends StatelessWidget {
-  const _PartnershipCard();
+  final Partnership partnership;
+  const _PartnershipCard({required this.partnership});
 
   @override
   Widget build(BuildContext context) {
@@ -501,19 +557,19 @@ class _PartnershipCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           RichText(
-            text: const TextSpan(
+            text: TextSpan(
               children: [
                 TextSpan(
-                  text: '45 ',
-                  style: TextStyle(
+                  text: '${partnership.runs} ',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 TextSpan(
-                  text: '(32 balls)',
-                  style: TextStyle(
+                  text: '(${partnership.balls} balls)',
+                  style: const TextStyle(
                     color: AppColors.slate400,
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
@@ -530,61 +586,34 @@ class _PartnershipCard extends StatelessWidget {
 
 // ─── Mini Scorecards ───────────────────────────────────────────────────────────
 class _MiniScorecards extends StatelessWidget {
-  const _MiniScorecards();
+  final List<BatsmanScore> batsmen;
+  const _MiniScorecards({required this.batsmen});
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: const [
-        Expanded(
-          child: _BatsmanCard(
-            name: 'V. Kohli*',
-            runs: '82',
-            balls: '54',
-            fours: 6,
-            sixes: 2,
-            sr: '151.8',
-            active: true,
+      children: [
+        if (batsmen.isNotEmpty)
+          Expanded(
+            child: _BatsmanCard(score: batsmen[0]),
           ),
-        ),
-        SizedBox(width: 16),
-        Expanded(
-          child: _BatsmanCard(
-            name: 'KL Rahul',
-            runs: '14',
-            balls: '12',
-            fours: 1,
-            sixes: 0,
-            sr: '116.6',
-            active: false,
+        const SizedBox(width: 16),
+        if (batsmen.length > 1)
+          Expanded(
+            child: _BatsmanCard(score: batsmen[1]),
           ),
-        ),
       ],
     );
   }
 }
 
 class _BatsmanCard extends StatelessWidget {
-  final String name;
-  final String runs;
-  final String balls;
-  final int fours;
-  final int sixes;
-  final String sr;
-  final bool active;
-
-  const _BatsmanCard({
-    required this.name,
-    required this.runs,
-    required this.balls,
-    required this.fours,
-    required this.sixes,
-    required this.sr,
-    required this.active,
-  });
+  final BatsmanScore score;
+  const _BatsmanCard({required this.score});
 
   @override
   Widget build(BuildContext context) {
+    final active = score.isActive ?? false;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       decoration: BoxDecoration(
@@ -598,8 +627,6 @@ class _BatsmanCard extends StatelessWidget {
                 bottom: BorderSide(color: AppColors.white5),
               )
             : Border.all(color: AppColors.white5),
-        // No elevation so the active card doesn't visually sit "on top"
-        // of the other card; only the left accent bar differentiates it.
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -608,7 +635,7 @@ class _BatsmanCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                name,
+                score.name,
                 style: TextStyle(
                   color: active ? Colors.white : const Color(0xFFCBD5E1),
                   fontWeight: FontWeight.w700,
@@ -626,7 +653,7 @@ class _BatsmanCard extends StatelessWidget {
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                runs,
+                score.runs,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 26,
@@ -635,14 +662,14 @@ class _BatsmanCard extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                '($balls)',
+                '(${score.balls})',
                 style: const TextStyle(color: AppColors.slate400, fontSize: 13),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
-            '4s: $fours   6s: $sixes   SR: $sr',
+            '4s: ${score.fours}   6s: ${score.sixes}   SR: ${score.sr}',
             style: const TextStyle(
               color: AppColors.slate400,
               fontSize: 10,
@@ -657,7 +684,8 @@ class _BatsmanCard extends StatelessWidget {
 
 // ─── Bowler Card ───────────────────────────────────────────────────────────────
 class _BowlerCard extends StatelessWidget {
-  const _BowlerCard();
+  final BowlerScore bowler;
+  const _BowlerCard({required this.bowler});
 
   @override
   Widget build(BuildContext context) {
@@ -688,19 +716,19 @@ class _BowlerCard extends StatelessWidget {
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   Text(
-                    'M. Starc',
-                    style: TextStyle(
+                    bowler.name,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
                     ),
                   ),
-                  SizedBox(height: 2),
+                  const SizedBox(height: 2),
                   Text(
-                    '8.3 - 0 - 52 - 2',
-                    style: TextStyle(
+                    '${bowler.overs} - ${bowler.maidens} - ${bowler.runs} - ${bowler.wickets}',
+                    style: const TextStyle(
                       color: AppColors.slate400,
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
@@ -724,7 +752,7 @@ class _BowlerCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Row(
-                children: ['1', '4', '0']
+                children: (bowler.currentOverBalls ?? [])
                     .map((ball) => Padding(
                           padding: const EdgeInsets.only(left: 4),
                           child: _BallChip(label: ball, isHighlight: false),
