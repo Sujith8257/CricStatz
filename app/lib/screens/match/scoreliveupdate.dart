@@ -1847,16 +1847,60 @@ class _ScoreLiveUpdateScreenState extends State<ScoreLiveUpdateScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Text('CRR',
-                      style:
-                          TextStyle(color: AppPalette.textMuted, fontSize: 12)),
-                  Text(
-                    _calculateCurrentRunRate().toStringAsFixed(2),
-                    style: const TextStyle(
-                        color: AppPalette.accent,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const Text('CRR',
+                              style: TextStyle(color: AppPalette.textMuted, fontSize: 12)),
+                          Text(
+                            _calculateCurrentRunRate().toStringAsFixed(2),
+                            style: const TextStyle(
+                                color: AppPalette.accent,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      if (_innings == 2 && _target > 0 && _calculateRequiredRunRate() > 0) ...[
+                        const SizedBox(width: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            const Text('RRR',
+                                style: TextStyle(color: AppPalette.textMuted, fontSize: 12)),
+                            Text(
+                              _calculateRequiredRunRate().toStringAsFixed(2),
+                              style: const TextStyle(
+                                  color: Colors.orangeAccent,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
                   ),
+                  if (_innings == 2 && _target > 0) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _runs >= _target ? 'Target achieved' : 'Need ${_target - _runs} runs',
+                      style: TextStyle(
+                        color: _runs >= _target ? AppPalette.success : Colors.orangeAccent,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      'Target: $_target',
+                      style: const TextStyle(
+                        color: AppPalette.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ],
